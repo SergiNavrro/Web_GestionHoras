@@ -4,7 +4,7 @@ from datetime import datetime
 def init():
     con = None
     try:
-        con = mysql.connector.connect(user='root_sergi', password='Root123!')  # Ajusta user/pass si hace falta
+        con = mysql.connector.connect(host='db4free.net', user='root_sergi', password='Root123!')
         cur = con.cursor()
 
         cur.execute("CREATE DATABASE IF NOT EXISTS paqui_bd")
@@ -62,7 +62,8 @@ def init():
 
 # Función para añadir usuario
 def addUser(user):
-    con = mysql.connector.connect(user='root_sergi', password='Root123!', database='paqui_bd')
+    con = mysql.connector.connect(host='db4free.net', user='root_sergi', password='Root123!', database='paqui_bd')
+
     try:
         cur = con.cursor()
         # Primero comprobamos si ya existe el usuario
@@ -84,7 +85,8 @@ def addUser(user):
 
 # Función para añadir administrador
 def addAdmin(admin):
-    con = mysql.connector.connect(user='root_sergi', password='Root123!', database='paqui_bd')
+    con = mysql.connector.connect(host='db4free.net', user='root_sergi', password='Root123!', database='paqui_bd')
+
     try:
         cur = con.cursor()
         # Primero comprobamos si ya existe el administrador
@@ -106,7 +108,8 @@ def addAdmin(admin):
 
 # Función para comprobar login
 def checkLogin(username, password, tipo):
-    con = mysql.connector.connect(user='root_sergi', password='Root123!', database='paqui_bd')
+    con = mysql.connector.connect(host='db4free.net', user='root_sergi', password='Root123!', database='paqui_bd')
+
     try:
         cur = con.cursor(dictionary=True)
         if not tipo:
@@ -124,7 +127,8 @@ def fichar(username, tipo):
     """
     Inserta un nuevo fichaje separando la fecha y la hora en sus respectivas columnas.
     """
-    con = mysql.connector.connect(user='root_sergi', password='Root123!', database='paqui_bd')
+    con = mysql.connector.connect(host='db4free.net', user='root_sergi', password='Root123!', database='paqui_bd')
+
     try:
         cur = con.cursor(dictionary=True)
         # La consulta ahora inserta en las columnas 'fecha' y 'hora'
@@ -150,7 +154,8 @@ def listar_fichajes(username, fecha_busqueda=None):
     - Si se proporciona 'fecha_busqueda' (en formato 'YYYY-MM-DD'), devuelve todos los
       fichajes de ese día (para recálculos del admin).
     """
-    con = mysql.connector.connect(user='root_sergi', password='Root123!', database='paqui_bd')
+    con = mysql.connector.connect(host='db4free.net', user='root_sergi', password='Root123!', database='paqui_bd')
+
     try:
         cur = con.cursor(dictionary=True)
 
@@ -187,7 +192,8 @@ def listar_fichajes(username, fecha_busqueda=None):
         con.close()
 
 def obtener_horas(username):
-    con = mysql.connector.connect(user='root_sergi', password='Root123!', database='paqui_bd')
+    con = mysql.connector.connect(host='db4free.net', user='root_sergi', password='Root123!', database='paqui_bd')
+
     try:
         cur = con.cursor(dictionary=True)
         cur.execute("""
@@ -211,7 +217,7 @@ def insertar_horas_diarias(username, horas_calculadas_str):
     manteniendo solo dos columnas en la tabla. La unicidad se gestiona
     mediante código.
     """
-    
+
     # 1. Extraemos la fecha y la hora de la cadena 'YYYY-MM-DD - HH:MM:SS'
     try:
         fecha_str, tiempo_str = horas_calculadas_str.split(' - ')
@@ -219,7 +225,8 @@ def insertar_horas_diarias(username, horas_calculadas_str):
         print(f"Error: El formato de horas_calculadas_str ('{horas_calculadas_str}') no es válido.")
         return False
 
-    con = mysql.connector.connect(user='root_sergi', password='Root123!', database='paqui_bd')
+    con = mysql.connector.connect(host='db4free.net', user='root_sergi', password='Root123!', database='paqui_bd')
+
     try:
         # Usamos un cursor con buffer para poder hacer múltiples execute sin problemas
         cur = con.cursor(buffered=True) 
@@ -262,7 +269,8 @@ def insertar_horas_diarias(username, horas_calculadas_str):
         con.close()
 
 def insertar_horas_totales(username, horas_totales):
-    con = mysql.connector.connect(user='root_sergi', password='Root123!', database='paqui_bd')
+    con = mysql.connector.connect(host='db4free.net', user='root_sergi', password='Root123!', database='paqui_bd')
+
     try:
         cur = con.cursor()
         # Insertar o actualizar en la misma operación
@@ -281,7 +289,8 @@ def insertar_horas_totales(username, horas_totales):
 
 def estado_fichaje(username):
     # La conexión debe estar definida en algún sitio, la incluyo aquí por claridad
-    con = mysql.connector.connect(user='root_sergi', password='Root123!', database='paqui_bd')
+    con = mysql.connector.connect(host='db4free.net', user='root_sergi', password='Root123!', database='paqui_bd')
+
     try:
         cur = con.cursor(dictionary=True)
 
@@ -303,7 +312,8 @@ def estado_fichaje(username):
 def ver_horas_diarias(username):
     con = None
     try:
-        con = mysql.connector.connect(user='root_sergi', password='Root123!', database='paqui_bd')
+        con = mysql.connector.connect(host='db4free.net', user='root_sergi', password='Root123!', database='paqui_bd')
+
 
         cur = con.cursor(dictionary=True)
 
@@ -328,7 +338,8 @@ def ver_horas_diarias(username):
 def insertar_comentario(username, hora, comentario):
     con = None
     try:
-        con = mysql.connector.connect(user='root_sergi', password='Root123!', database='paqui_bd')
+        con = mysql.connector.connect(host='db4free.net', user='root_sergi', password='Root123!', database='paqui_bd')
+
         cur = con.cursor()
 
         query = "UPDATE fichajes SET comentario = %s WHERE username = %s AND hora = %s"
@@ -375,7 +386,8 @@ def editar_jornada_admin(username, fecha_jornada, nuevos_fichajes):
         bool: True si la operación fue exitosa, False en caso de error.
     """
 
-    con = mysql.connector.connect(user='root_sergi', password='Root123!', database='paqui_bd')
+    con = mysql.connector.connect(host='db4free.net', user='root_sergi', password='Root123!', database='paqui_bd')
+
     try:
         cur = con.cursor()
 
