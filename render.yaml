@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: gestion-horas
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python rest.py"
+    envVars:
+      - key: DB_HOST
+        value: db4free.net
+      - key: DB_USER
+        value: root_sergi
+      - key: DB_PASSWORD
+        value: Root123!
+      - key: DB_NAME
+        value: paqui_bd
+
