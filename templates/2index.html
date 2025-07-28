@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Control de Fichajes</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f2f5;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        h2 {
+            margin-bottom: 25px;
+            color: #1c1e21;
+            font-size: 1.8rem;
+            text-align: center;
+        }
+        h3 {
+            text-align: center;
+            margin-bottom: 15px;
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 25px;
+        }
+        button, .boton-accion {
+            width: 100%;
+            max-width: 350px;
+            padding: 15px;
+            margin: 10px 0;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.25);
+            transition: all 0.3s ease;
+        }
+        button:hover:not(:disabled), .boton-accion:hover {
+            background: #0056b3;
+            box-shadow: 0 6px 16px rgba(0, 86, 179, 0.3);
+        }
+        button:disabled {
+            background: #adb5bd;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        input[type=text], input[type=password], input[type=time] {
+            width: 100%;
+            max-width: 330px;
+            padding: 14px;
+            margin: 8px 0 18px 0;
+            border-radius: 6px;
+            border: 1px solid #dddfe2;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        input[type=text]:focus, input[type=password]:focus, input[type=time]:focus {
+            border-color: #007bff;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+        }
+        #logout-btn, #admin-logout-btn {
+            margin-top: 20px;
+            background: #dc3545;
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.25);
+        }
+        #logout-btn:hover, #admin-logout-btn:hover {
+            background: #c82333;
+        }
+        
+        #pantalla-principal, #pantalla-login, #seleccionar-rol, #pantalla-admin {
+            background-color: white;
+            padding: 25px 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+            width: 90vw;
+            max-width: 480px; 
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #seleccionar-rol { display: flex; }
+
+        #mensaje-fichar, #mensaje-error-login, #mensaje-error, #admin-mensaje, .success, .error {
+            padding: 12px 15px; border-radius: 6px; width: 100%; box-sizing: border-box;
+            text-align: center; margin-top: 15px; font-weight: 500;
+        }
+        #mensaje-fichar, .success { background-color: #e0f8e9; color: #1d7b42; border: 1px solid #a8e6be; }
+        #mensaje-error-login, #mensaje-error, .error { background-color: #f8e0e0; color: #c0392b; border: 1px solid #f5b7b1; }
+        
+        #contenedor-fichajes, #admin-contenedor-fichajes {
+            width: 100%; margin-top: 25px; border-top: 1px solid #eee; padding-top: 15px;
+        }
+        
+        .fichaje-item {
+            background-color: #f8f9fa; border-radius: 8px; padding: 12px 15px; margin-bottom: 10px;
+            display: flex; justify-content: space-between; align-items: center; border: 1px solid #e9ecef;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .fichaje-item:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        .fichaje-info { display: flex; flex-direction: column; }
+        .fichaje-tipo { font-weight: bold; color: #343a40; font-size: 1rem; text-transform: capitalize; }
+        .fichaje-hora { font-size: 0.85rem; color: #6c757d; }
+        .fichaje-acciones { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+        .comentario-texto { font-size: 0.8rem; color: #28a745; font-style: italic; max-width: 120px; text-align: right; word-wrap: break-word; }
+        
+        .boton-comentario, .boton-editar-admin {
+            padding: 5px 12px; font-size: 0.8rem; font-weight: 500; background-color: #6c757d;
+            color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.2s ease;
+        }
+        .boton-comentario:hover, .boton-editar-admin:hover { background-color: #5a6268; }
+
+        #resultadoHorasDiarias { width: 100%; margin-top: 15px; }
+        #resultadoHorasDiarias div { background-color: #e9ecef; padding: 12px; margin-top: 8px; border-radius: 8px; border-left: 5px solid #007bff; font-size: 0.95rem; line-height: 1.5; }
+
+        #admin-edit-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6);
+            display: none; align-items: center; justify-content: center; z-index: 1000;
+        }
+        .modal-content {
+            background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            width: 90vw; max-width: 400px; text-align: left;
+        }
+        .modal-content h3 { text-align: center; margin-top: 0; margin-bottom: 20px; }
+        .modal-content label { display: block; margin-top: 15px; margin-bottom: 5px; font-weight: 600; color: #495057; }
+        .modal-content input[type=time] { max-width: 100%; }
+        .modal-actions { margin-top: 30px; display: flex; justify-content: space-between; gap: 15px; }
+    </style>
+</head>
+<body>
+
+    <!-- PASO 1: ELEGIR ROL -->
+    <div id="seleccionar-rol">
+        <h2>Elige tu tipo de acceso</h2>
+        <button id="btn-user">Entrar como Usuario</button>
+        <button id="btn-admin">Entrar como Admin</button>
+        <div id="mensaje-error" style="display:none;"></div>
+    </div>
+
+    <!-- PASO 2: LOGIN -->
+    <div id="pantalla-login" style="display:none;">
+        <h2>Login <span id="rol-seleccionado"></span></h2>
+        <input type="text" id="input-username" placeholder="Usuario" autocomplete="username" />
+        <input type="password" id="input-password" placeholder="Contraseña" autocomplete="current-password" />
+        <button id="btn-login">Iniciar sesión</button>
+        <button id="btn-volver" style="background:#6c757d; margin-top:10px;">Volver</button>
+        <div id="mensaje-error-login" style="display:none;"></div>
+    </div>
+
+    <!-- PASO 3A: PANTALLA PRINCIPAL USUARIO (SIN CAMBIOS) -->
+    <div id="pantalla-principal" style="display:none;">
+        <h2>Bienvenido, <span id="nombre-usuario"></span></h2>
+        <button id="btn-fichar">entrada</button>
+        <div id="mensaje-fichar" style="display:none;"></div>
+        <div id="contenedor-fichajes" style="display: none; width: 100%;">
+            <h3 style="text-align: center; margin-bottom: 15px; color: #333;">Listado de fichajes</h3>
+            <div id="lista-fichajes"></div>
+        </div>
+        <button onclick="verHorasDiarias()" class="boton-accion">Ver Resumen Diario</button>
+        <div id="resultadoHorasDiarias"></div>
+        <button id="logout-btn">Cerrar sesión</button>
+    </div>
+
+    <!-- PASO 3B: PANTALLA ADMIN (NUEVA) -->
+    <div id="pantalla-admin" style="display:none;">
+        <h2>Panel de Administrador</h2>
+        <h3>Buscar Fichajes de Usuario</h3>
+        <input type="text" id="admin-buscar-usuario-input" placeholder="Nombre de usuario a buscar...">
+        <button id="admin-btn-buscar" class="boton-accion">Buscar</button>
+        <div id="admin-contenedor-fichajes" style="display: none;">
+            <div id="admin-lista-fichajes"></div>
+        </div>
+        <h3>Añadir Nuevo Usuario</h3>
+        <input type="text" id="admin-nuevo-usuario-input" placeholder="Nombre de nuevo usuario">
+        <input type="password" id="admin-nuevo-pass-input" placeholder="Contraseña para nuevo usuario">
+        <button id="admin-btn-anadir" class="boton-accion">Añadir Usuario</button>
+        <div id="admin-mensaje" style="display: none;"></div>
+        <button id="admin-logout-btn">Cerrar sesión</button>
+    </div>
+
+    <!-- MODAL DE EDICIÓN PARA EL ADMIN (NUEVO Y OCULTO) -->
+    <div id="admin-edit-modal">
+        <div class="modal-content">
+            <h3>Editar Jornada</h3>
+            <p>Editando jornada del día: <strong id="modal-fecha-jornada"></strong></p>
+            <p>Usuario: <strong id="modal-usuario-jornada"></strong></p>
+            <label for="modal-entrada">Entrada</label>
+            <input type="time" id="modal-entrada" step="1">
+            <label for="modal-parada-cenar">Parada Cenar</label>
+            <input type="time" id="modal-parada-cenar" step="1">
+            <label for="modal-salida-cenar">Salida Cenar</label>
+            <input type="time" id="modal-salida-cenar" step="1">
+            <label for="modal-salida">Salida</label>
+            <input type="time" id="modal-salida" step="1">
+            <div class="modal-actions">
+                <button id="modal-btn-cancelar" style="background:#6c757d;">Cancelar</button>
+                <button id="modal-btn-guardar">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+
+<script>
+    // Variables globales
+    let rolSeleccionado = null;
+    let estadoFichaje = 'entrada';
+    let usuarioActual = null;
+
+    // --- Selectores principales ---
+    const seleccionarRolDiv = document.getElementById('seleccionar-rol');
+    const pantallaLogin = document.getElementById('pantalla-login');
+    const pantallaPrincipal = document.getElementById('pantalla-principal');
+    const pantallaAdmin = document.getElementById('pantalla-admin');
+
+    // --- Selectores de Login ---
+    const btnUser = document.getElementById('btn-user');
+    const btnAdmin = document.getElementById('btn-admin');
+    const mensajeError = document.getElementById('mensaje-error');
+    const rolSpan = document.getElementById('rol-seleccionado');
+    const inputUsername = document.getElementById('input-username');
+    const inputPassword = document.getElementById('input-password');
+    const btnLogin = document.getElementById('btn-login');
+    const btnVolver = document.getElementById('btn-volver');
+    const mensajeErrorLogin = document.getElementById('mensaje-error-login');
+
+    // --- Selectores de Pantalla Usuario ---
+    const nombreUsuarioSpan = document.getElementById('nombre-usuario');
+    const btnFichar = document.getElementById('btn-fichar');
+    const mensajeFichar = document.getElementById('mensaje-fichar');
+    const contenedorFichajes = document.getElementById('contenedor-fichajes');
+    const listaFichajesDiv = document.getElementById('lista-fichajes');
+    const logoutBtn = document.getElementById('logout-btn');
+    const resultadoHorasDiariasDiv = document.getElementById('resultadoHorasDiarias');
+    
+    // --- Selectores del panel de Administrador ---
+    const adminBtnBuscar = document.getElementById('admin-btn-buscar');
+    const adminBuscarInput = document.getElementById('admin-buscar-usuario-input');
+    const adminContenedorFichajes = document.getElementById('admin-contenedor-fichajes');
+    const adminListaFichajesDiv = document.getElementById('admin-lista-fichajes');
+    const adminBtnAnadir = document.getElementById('admin-btn-anadir');
+    const adminNuevoUsuarioInput = document.getElementById('admin-nuevo-usuario-input');
+    const adminNuevoPassInput = document.getElementById('admin-nuevo-pass-input');
+    const adminMensajeDiv = document.getElementById('admin-mensaje');
+    const adminLogoutBtn = document.getElementById('admin-logout-btn');
+
+    // --- Selectores del Modal de Edición ---
+    const adminEditModal = document.getElementById('admin-edit-modal');
+    const modalFechaJornada = document.getElementById('modal-fecha-jornada');
+    const modalUsuarioJornada = document.getElementById('modal-usuario-jornada');
+    const modalBtnCancelar = document.getElementById('modal-btn-cancelar');
+    const modalBtnGuardar = document.getElementById('modal-btn-guardar');
+    
+    // ======================
+    // LÓGICA DE NAVEGACIÓN
+    // ======================
+
+    btnUser.onclick = () => enviarRol('user');
+    btnAdmin.onclick = () => enviarRol('admin');
+
+    function enviarRol(tipo) {
+        fetch('/web_seguimiento/admin_user', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(tipo)
+        })
+        .then(res => {
+            if(!res.ok) throw new Error("Error al seleccionar rol");
+            return res.json();
+        })
+        .then(data => {
+            rolSeleccionado = tipo;
+            mensajeError.style.display = 'none';
+            seleccionarRolDiv.style.display = 'none';
+            pantallaLogin.style.display = 'flex';
+            rolSpan.textContent = tipo === 'admin' ? '(Admin)' : '(Usuario)';
+            inputUsername.value = '';
+            inputPassword.value = '';
+            mensajeErrorLogin.style.display = 'none';
+            inputUsername.focus();
+        })
+        .catch(err => {
+            mensajeError.textContent = err.message || 'Error desconocido';
+            mensajeError.style.display = 'block';
+        });
+    }
+
+    btnVolver.onclick = () => {
+        pantallaLogin.style.display = 'none';
+        seleccionarRolDiv.style.display = 'block';
+        mensajeErrorLogin.textContent = '';
+        mensajeErrorLogin.style.display = 'none';
+    };
+    
+    // ===============================
+    // LÓGICA DE LOGIN (CORREGIDA)
+    // ===============================
+
+    btnLogin.onclick = () => {
+        mensajeErrorLogin.style.display = 'none';
+        const usuario = inputUsername.value.trim();
+        const pass = inputPassword.value;
+
+        if(!usuario || !pass) {
+            mensajeErrorLogin.textContent = 'Completa todos los campos.';
+            mensajeErrorLogin.style.display = 'block';
+            return;
+        }
+
+        fetch('/web_seguimiento/login', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({username: usuario, password: pass})
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'ok'){
+                usuarioActual = usuario;
+                pantallaLogin.style.display = 'none';
+
+                if (rolSeleccionado === 'admin') {
+                    pantallaAdmin.style.display = 'flex';
+                } else {
+                    estadoFichaje = data.siguiente_estado;
+                    nombreUsuarioSpan.textContent = usuarioActual;
+                    mensajeFichar.style.display = 'none';
+                    cargarFichajes();
+                    pantallaPrincipal.style.display = 'flex';
+                    actualizarBotonFichar();
+                }
+
+            } else {
+                mensajeErrorLogin.textContent = data.message || 'Error en login';
+                mensajeErrorLogin.style.display = 'block';
+            }
+        })
+        .catch(() => {
+            mensajeErrorLogin.textContent = 'Error de conexión con el servidor.';
+            mensajeErrorLogin.style.display = 'block';
+        });
+    };
+    
+    // ==========================================================
+    // ==         SECCIÓN DE LÓGICA DEL USUARIO (INTACTA)        ==
+    // ==========================================================
+
+    function actualizarBotonFichar() {
+        if (estadoFichaje === 'finalizado') {
+            btnFichar.textContent = 'Jornada Finalizada';
+            btnFichar.disabled = true;
+            setTimeout(() => {
+                btnFichar.textContent = 'entrada';
+                btnFichar.disabled = false;
+                estadoFichaje = 'entrada';
+            }, 5000);
+        } else {
+            btnFichar.disabled = false;
+            btnFichar.textContent = estadoFichaje;
+        }
+    }
+
+    btnFichar.onclick = () => {
+        btnFichar.disabled = true;
+        const tipoEnviar = btnFichar.textContent;
+        fetch('/fichar/' + usuarioActual, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ boton_fichar: tipoEnviar })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.fichajes){
+                mostrarFichajes(data.fichajes); // Llama a la función de usuario
+                if(tipoEnviar === 'entrada')           estadoFichaje = 'parada_cenar';
+                else if(tipoEnviar === 'parada_cenar')  estadoFichaje = 'salida_cenar';
+                else if(tipoEnviar === 'salida_cenar')  estadoFichaje = 'salida';
+                else if(tipoEnviar === 'salida')        estadoFichaje = 'finalizado';
+                actualizarBotonFichar();
+            } else {
+                btnFichar.disabled = false;
+            }
+        })
+        .finally(() => {
+            if (estadoFichaje !== 'finalizado') {
+                btnFichar.disabled = false;
+            }
+        });
+    };
+
+    function mostrarFichajes(fichajes) {
+        listaFichajesDiv.innerHTML = '';
+        contenedorFichajes.style.display = fichajes.length > 0 ? 'block' : 'none';
+        
+        fichajes.slice().reverse().forEach(f => {
+            const item = document.createElement('div');
+            item.className = 'fichaje-item';
+            const info = document.createElement('div');
+            info.className = 'fichaje-info';
+            const tipo = document.createElement('div');
+            tipo.className = 'fichaje-tipo';
+            tipo.textContent = f.tipo.replace('_', ' ');
+            const hora = document.createElement('div');
+            hora.className = 'fichaje-hora';
+            const fecha = new Date(f.hora);
+            hora.textContent = fecha.toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            info.appendChild(tipo); info.appendChild(hora);
+            const acciones = document.createElement('div');
+            acciones.className = 'fichaje-acciones';
+            const comentarioTexto = document.createElement('span');
+            comentarioTexto.className = 'comentario-texto';
+            comentarioTexto.textContent = f.comentario || '';
+            const botonComentar = document.createElement('button');
+            botonComentar.textContent = f.comentario ? 'Editar' : 'Añadir';
+            botonComentar.className = 'boton-comentario';
+            botonComentar.dataset.hora_original = f.hora;
+            botonComentar.onclick = () => agregarComentario(botonComentar);
+            acciones.appendChild(comentarioTexto);
+            acciones.appendChild(botonComentar);
+            item.appendChild(info);
+            item.appendChild(acciones);
+            listaFichajesDiv.appendChild(item);
+        });
+    }
+
+    function agregarComentario(boton) {
+        const horaOriginalFichaje = boton.dataset.hora_original;
+        const comentarioActual = boton.previousElementSibling.textContent;
+        const nuevoComentario = prompt("Añade o edita tu comentario:", comentarioActual);
+        if (nuevoComentario === null) return;
+        fetch('/comentario', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: usuarioActual,
+                hora_fichaje: horaOriginalFichaje,
+                comentario: nuevoComentario
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                cargarFichajes();
+            } else {
+                alert('Error al guardar: ' + data.message);
+            }
+        });
+    }
+
+    function cargarFichajes(){
+        fetch('/fichar/' + usuarioActual, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({boton_fichar: 'listar'})
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.fichajes && data.fichajes.length > 0){
+                mostrarFichajes(data.fichajes);
+            } else {
+                contenedorFichajes.style.display = 'none';
+            }
+        });
+    }
+
+    logoutBtn.onclick = () => {
+        fetch('/logout', { method: 'POST' }).finally(() => {
+            usuarioActual = null; estadoFichaje = 'entrada';
+            pantallaPrincipal.style.display = 'none';
+            seleccionarRolDiv.style.display = 'block';
+            listaFichajesDiv.innerHTML = '';
+            resultadoHorasDiariasDiv.innerHTML = '';
+            btnFichar.textContent = 'entrada'; btnFichar.disabled = false;
+        });
+    };
+    
+    function verHorasDiarias() {
+        const username = usuarioActual;
+        resultadoHorasDiariasDiv.innerHTML = 'Cargando...';
+
+        if (!username) {
+            resultadoHorasDiariasDiv.innerHTML = "No has iniciado sesión.";
+            return;
+        }
+
+        fetch(`/horas_diarias/${username}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'ok' && data.resumen && data.resumen.length > 0) {
+                    resultadoHorasDiariasDiv.innerHTML = ''; 
+                    data.resumen.forEach(dia => {
+                        const diaDiv = document.createElement('div');
+                        const horas = dia.horas_diarias || 'N/A';
+                        const comentario = dia.comentarios || 'Sin comentarios';
+                        const fecha = new Date(horas.split(' - ')[0]);
+                        const fechaFormateada = fecha.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                        const tiempoTrabajado = horas.split(' - ')[1];
+                        diaDiv.innerHTML = `<strong>${fechaFormateada}</strong><br>Horas trabajadas: <strong>${tiempoTrabajado}</strong><br><em>${comentario}</em>`;
+                        resultadoHorasDiariasDiv.appendChild(diaDiv);
+                    });
+                } else if (data.status === 'ok') {
+                    resultadoHorasDiariasDiv.textContent = "No hay resúmenes diarios registrados.";
+                } else {
+                    resultadoHorasDiariasDiv.textContent = `Error: ${data.message || 'Error desconocido'}`;
+                }
+            })
+            .catch(error => {
+                console.error("Error consultando horas diarias:", error);
+                resultadoHorasDiariasDiv.textContent = "Error de conexión con el servidor.";
+            });
+    }
+
+    // ==========================================================
+    // ==      SECCIÓN DE LÓGICA DEL ADMINISTRADOR             ==
+    // ==========================================================
+    
+    adminBtnBuscar.onclick = () => {
+        const userToSearch = adminBuscarInput.value.trim();
+        if (!userToSearch) { alert("Por favor, introduce un nombre de usuario."); return; }
+        adminContenedorFichajes.style.display = 'none';
+        adminListaFichajesDiv.innerHTML = "Buscando...";
+        fetch('/listar/admin', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: userToSearch })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                if(data.fichajes.length > 0) {
+                    adminContenedorFichajes.style.display = 'block';
+                    mostrarFichajesAdmin(userToSearch, data.fichajes);
+                } else {
+                    adminListaFichajesDiv.innerHTML = '';
+                    alert(`No se encontraron fichajes para el usuario '${userToSearch}'.`);
+                }
+            } else {
+                adminListaFichajesDiv.innerHTML = ''; alert(`Error: ${data.message}`);
+            }
+        })
+        .catch(err => {
+            adminListaFichajesDiv.innerHTML = ''; alert("Error de conexión al buscar fichajes.");
+        });
+    };
+    
+    // ----------- FUNCIÓN MODIFICADA PARA MOSTRAR JORNADAS Y COMENTARIOS -----------
+    function mostrarFichajesAdmin(username, fichajes) {
+        adminListaFichajesDiv.innerHTML = '';
+        const fichajesPorDia = fichajes.reduce((acc, f) => {
+            const fecha = new Date(f.hora).toISOString().split('T')[0];
+            if (!acc[fecha]) acc[fecha] = [];
+            acc[fecha].push(f);
+            return acc;
+        }, {});
+        
+        Object.keys(fichajesPorDia).sort().reverse().forEach(fecha => {
+            const fichajesDelDia = fichajesPorDia[fecha];
+            
+            const primerComentario = fichajesDelDia.find(f => f.comentario && f.comentario.trim() !== '');
+
+            let comentarioHtml = '';
+            if (primerComentario) {
+                comentarioHtml = `
+                    <div class='fichaje-hora' style="margin-top: 8px; color: #28a745; font-style: italic; display: flex; align-items: center; gap: 5px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M16 8c0 3.866-3.582 7-8 7a9 9 0 0 1-2.347-.306c-.584.296-1.925.864-4.181 1.234-.2.032-.352-.176-.273-.362.354-.836.674-1.95.77-2.966C.744 11.37 0 9.76 0 8c0-3.866 3.582-7 8-7s8 3.134 8 7zM5 8a1 1 0 1 0-2 0 1 1 0 0 0 2 0zm4 0a1 1 0 1 0-2 0 1 1 0 0 0 2 0zm3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/>
+                        </svg>
+                        <span>${primerComentario.comentario.substring(0, 30)}${primerComentario.comentario.length > 30 ? '...' : ''}</span>
+                    </div>
+                `;
+            }
+            
+            const jornadaItem = document.createElement('div');
+            jornadaItem.className = 'fichaje-item';
+            
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'fichaje-info';
+            infoDiv.innerHTML = `
+                <div class='fichaje-tipo'>Jornada del ${new Date(fecha+'T00:00:00').toLocaleDateString('es-ES')}</div>
+                <div class='fichaje-hora' style="margin-top: 5px;">${fichajesDelDia.length} registros</div>
+                ${comentarioHtml}
+            `;
+            
+            const accionesDiv = document.createElement('div');
+            accionesDiv.className = 'fichaje-acciones';
+            const botonEditar = document.createElement('button');
+            botonEditar.textContent = 'Editar';
+            botonEditar.className = 'boton-editar-admin';
+            botonEditar.style.cssText = "padding: 8px 15px; font-size: 0.9rem;";
+            botonEditar.onclick = () => abrirModalEdicion(username, fecha, fichajesDelDia);
+            accionesDiv.appendChild(botonEditar);
+            
+            jornadaItem.appendChild(infoDiv);
+            jornadaItem.appendChild(accionesDiv);
+            adminListaFichajesDiv.appendChild(jornadaItem);
+        });
+    }
+
+    function abrirModalEdicion(username, fechaJornada, fichajes) {
+        modalUsuarioJornada.textContent = username;
+        modalFechaJornada.textContent = new Date(fechaJornada + 'T00:00:00').toLocaleDateString('es-ES');
+        const getHora = (tipo) => {
+            const f = fichajes.find(f => f.tipo === tipo);
+            if (!f) return '';
+            const d = new Date(f.hora);
+            return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}`;
+        };
+        document.getElementById('modal-entrada').value = getHora('entrada');
+        document.getElementById('modal-parada-cenar').value = getHora('parada_cenar');
+        document.getElementById('modal-salida-cenar').value = getHora('salida_cenar');
+        document.getElementById('modal-salida').value = getHora('salida');
+        modalBtnGuardar.onclick = () => guardarCambiosJornada(username, fechaJornada);
+        adminEditModal.style.display = 'flex';
+    }
+
+    modalBtnCancelar.onclick = () => { adminEditModal.style.display = 'none'; };
+
+    function guardarCambiosJornada(username, fechaJornada) {
+        const datosEditados = {
+            username: username, fecha_jornada: fechaJornada,
+            fichajes: {
+                entrada: document.getElementById('modal-entrada').value,
+                parada_cenar: document.getElementById('modal-parada-cenar').value,
+                salida_cenar: document.getElementById('modal-salida-cenar').value,
+                salida: document.getElementById('modal-salida').value
+            }
+        };
+        if (!datosEditados.fichajes.entrada || !datosEditados.fichajes.salida) { alert("Los campos 'Entrada' y 'Salida' son obligatorios."); return; }
+        
+        modalBtnGuardar.disabled = true; modalBtnGuardar.textContent = 'Guardando...';
+
+        fetch('/admin/editar_jornada', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(datosEditados)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                alert('Jornada actualizada con éxito.');
+                adminEditModal.style.display = 'none';
+                adminBtnBuscar.click(); 
+            } else {
+                alert('Error al actualizar: ' + (data.message || 'Error desconocido.'));
+            }
+        })
+        .catch(err => alert('Error de conexión.'))
+        .finally(() => {
+            modalBtnGuardar.disabled = false; modalBtnGuardar.textContent = 'Guardar Cambios';
+        });
+    }
+
+    adminBtnAnadir.onclick = () => {
+        const nuevoUser = adminNuevoUsuarioInput.value.trim();
+        const nuevoPass = adminNuevoPassInput.value;
+        if (!nuevoUser || !nuevoPass) {
+            adminMensajeDiv.textContent = 'Debes rellenar el usuario y la contraseña.';
+            adminMensajeDiv.className = 'error'; adminMensajeDiv.style.display = 'block'; return;
+        }
+        fetch('/añadir_user/admin', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: nuevoUser, password: nuevoPass })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                adminMensajeDiv.textContent = data.success;
+                adminMensajeDiv.className = 'success';
+                adminNuevoUsuarioInput.value = ''; adminNuevoPassInput.value = '';
+            } else {
+                adminMensajeDiv.textContent = data.error || 'Error.';
+                adminMensajeDiv.className = 'error';
+            }
+            adminMensajeDiv.style.display = 'block';
+        })
+        .catch(err => {
+            adminMensajeDiv.textContent = 'Error de conexión.'; adminMensajeDiv.className = 'error';
+            adminMensajeDiv.style.display = 'block';
+        });
+    };
+    
+    adminLogoutBtn.onclick = () => {
+        fetch('/logout', { method: 'POST' }).finally(() => {
+            usuarioActual = null;
+            pantallaAdmin.style.display = 'none';
+            pantallaPrincipal.style.display = 'none';
+            seleccionarRolDiv.style.display = 'block';
+            adminBuscarInput.value = '';
+            adminContenedorFichajes.style.display = 'none';
+            adminListaFichajesDiv.innerHTML = '';
+            adminNuevoUsuarioInput.value = '';
+            adminNuevoPassInput.value = '';
+            adminMensajeDiv.style.display = 'none';
+        });
+    };
+</script>
+</body>
+</html>
