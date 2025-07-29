@@ -19,9 +19,9 @@ def init():
     try:
         # Para la inicialización, nos conectamos sin especificar la base de datos primero
         con = mysql.connector.connect(
-            host=os.getenv('DB_HOST', 'db4free.net'),
-            user=os.getenv('DB_USER', 'root_sergi'),
-            password=os.getenv('DB_PASSWORD', 'Root123!')
+            host="sql7.freesqldatabase.com",
+            user="sql7792522",
+            password="IXStwXlpHx"
         )
         cur = con.cursor()
         
