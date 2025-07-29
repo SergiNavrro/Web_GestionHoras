@@ -122,15 +122,17 @@ def checkLogin(username, password, tipo):
     finally:
         con.close()
 
-def fichar(username, tipo):
-    con = get_db_connection() # Usamos la función auxiliar
+def fichar(username, tipo, hora_actual): # <-- AÑADIMOS el parámetro hora_actual
+    con = get_db_connection()
     try:
         cur = con.cursor(dictionary=True)
+        # CAMBIAMOS NOW() por un placeholder %s
         query = """
-            INSERT INTO fichajes (username, tipo,hora)
-            VALUES (%s, %s, NOW())
+            INSERT INTO fichajes (username, tipo, hora)
+            VALUES (%s, %s, %s)
         """
-        cur.execute(query, (username, tipo))
+        # AÑADIMOS hora_actual a los parámetros de la consulta
+        cur.execute(query, (username, tipo, hora_actual))
         con.commit()
         return True
     except mysql.connector.Error as err:

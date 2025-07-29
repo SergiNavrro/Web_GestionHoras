@@ -98,12 +98,19 @@ def area_privada():
 
 @app.route('/fichar/<username>', methods=['POST'])
 def fichar_lista(username):
-  
     data = request.get_json()
     tipo = data.get('boton_fichar')
 
-    if tipo != 'listar':#añade hora en la tabla de fichajes
-        model.fichar(username, tipo)
+    if tipo != 'listar':
+        # --- ESTA ES LA PARTE IMPORTANTE ---
+        # 1. Definimos la zona horaria correcta
+        zona_horaria_madrid = pytz.timezone('Europe/Madrid')
+        
+        # 2. Obtenemos la hora actual en esa zona horaria
+        hora_actual = datetime.now(zona_horaria_madrid)
+        print(f"HORRAA ACUTAL ESSSS {hora_actual}")
+        # 3. Llamamos a la función del modelo con la hora generada
+        model.fichar(username, tipo, hora_actual)
 
     fichajes = model.listar_fichajes(username)
     print(f"Resultado del botón {tipo}")
