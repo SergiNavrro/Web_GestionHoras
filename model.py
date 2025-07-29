@@ -3,13 +3,16 @@ from datetime import datetime
 import os  # <-- AÑADIDO: Importamos la librería 'os'
 
 # Función auxiliar para crear la conexión, evitando repetir el código.
+import mysql.connector
+
 def get_db_connection():
-    return conexion = mysql.connector.connect(
+    conexion = mysql.connector.connect(
         host="sql7.freesqldatabase.com",
         user="sql7792522",
         password="IXStwXlpHx",
         database="sql7792522"
-)
+    )
+    return conexion
 	
 def init():
     con = None
