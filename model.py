@@ -25,7 +25,7 @@ def init():
         )
         cur = con.cursor()
         
-        db_name = os.getenv('DB_NAME', 'paqui_bd')
+        db_name = os.getenv('DB_NAME', 'sql7792522')
         cur.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
         cur.execute(f"USE {db_name}")
 
