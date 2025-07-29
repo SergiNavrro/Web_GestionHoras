@@ -4,13 +4,13 @@ import os  # <-- AÑADIDO: Importamos la librería 'os'
 
 # Función auxiliar para crear la conexión, evitando repetir el código.
 def get_db_connection():
-    return mysql.connector.connect(
-        host=os.getenv('DB_HOST', 'db4free.net'),          # Usamos las variables de entorno
-        user=os.getenv('DB_USER', 'root_sergi'),           # con valores por defecto para que siga
-        password=os.getenv('DB_PASSWORD', 'Root123!'),     # funcionando en tu entorno local si
-        database=os.getenv('DB_NAME', 'paqui_bd')          # no las defines.
-    )
-
+    return conexion = mysql.connector.connect(
+        host="sql7.freesqldatabase.com",
+        user="sql7792522",
+        password="IXStwXlpHx",
+        database="sql7792522"
+)
+	
 def init():
     con = None
     try:
