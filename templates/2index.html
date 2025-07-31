@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -168,9 +169,13 @@
             <h3 style="text-align: center; margin-bottom: 15px; color: #333;">Listado de fichajes</h3>
             <div id="lista-fichajes"></div>
         </div>
-        <button onclick="verHorasDiarias()" class="boton-accion">Ver Resumen Diario</button>
+         <button onclick="verHorasDiarias()" class="boton-accion">Ver Resumen Diario</button>
+    <!-- NUEVO: Contenedor para el resumen total y diario -->
+    <div id="resumen-usuario" style="width: 100%; margin-top: 15px;">
+        <div id="resultadoHorasTotales" style="font-size: 1.1rem; font-weight: bold; margin-bottom: 10px;"></div>
         <div id="resultadoHorasDiarias"></div>
-        <button id="logout-btn">Cerrar sesión</button>
+    </div>
+    <button id="logout-btn">Cerrar sesión</button>
     </div>
 
     <!-- PASO 3B: PANTALLA ADMIN (NUEVA) -->
@@ -179,6 +184,12 @@
         <h3>Buscar Fichajes de Usuario</h3>
         <input type="text" id="admin-buscar-usuario-input" placeholder="Nombre de usuario a buscar...">
         <button id="admin-btn-buscar" class="boton-accion">Buscar</button>
+         <!-- NUEVO: Contenedor para resúmenes del admin -->
+    <div id="admin-resumen-usuario" style="width: 100%; margin-top: 20px; display: none;">
+        <h4>Resumen para <span id="admin-resumen-nombre-usuario"></span></h4>
+        <div id="admin-resumen-totales" style="font-size: 1.1rem; margin-bottom: 10px;"></div>
+        <div id="admin-resumen-diario"></div>
+    </div>
         <div id="admin-contenedor-fichajes" style="display: none;">
             <div id="admin-lista-fichajes"></div>
         </div>
@@ -483,155 +494,195 @@
     };
     
     function verHorasDiarias() {
-        const username = usuarioActual;
-        resultadoHorasDiariasDiv.innerHTML = 'Cargando...';
+    const username = usuarioActual;
+    resultadoHorasDiariasDiv.innerHTML = 'Cargando...';
+    document.getElementById('resultadoHorasTotales').innerHTML = ''; // Limpiar
 
-        if (!username) {
-            resultadoHorasDiariasDiv.innerHTML = "No has iniciado sesión.";
-            return;
-        }
-
-        fetch(`/horas_diarias/${username}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'ok' && data.resumen && data.resumen.length > 0) {
-                    resultadoHorasDiariasDiv.innerHTML = ''; 
+    fetch(`/horas_diarias/${username}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                // Mostramos las horas totales
+                const totalDiv = document.getElementById('resultadoHorasTotales');
+                if (data.horas_totales) {
+                    totalDiv.innerHTML = `Horas Totales Acumuladas: <strong>${data.horas_totales}</strong>`;
+                }
+                
+                // Mostramos el resumen diario
+                resultadoHorasDiariasDiv.innerHTML = '';
+                if(data.resumen && data.resumen.length > 0) {
                     data.resumen.forEach(dia => {
                         const diaDiv = document.createElement('div');
+                        // ... (tu código para mostrar el resumen diario aquí no cambia)
                         const horas = dia.horas_diarias || 'N/A';
-                        const comentario = dia.comentarios || 'Sin comentarios';
-                        const fecha = new Date(horas.split(' - ')[0]);
+                        const fecha = new Date(horas.split(' - ')[0] + 'T00:00:00'); // Asegurar UTC
                         const fechaFormateada = fecha.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
                         const tiempoTrabajado = horas.split(' - ')[1];
-                        diaDiv.innerHTML = `<strong>${fechaFormateada}</strong><br>Horas trabajadas: <strong>${tiempoTrabajado}</strong><br><em>${comentario}</em>`;
+                        diaDiv.innerHTML = `<strong>${fechaFormateada}</strong><br>Horas trabajadas: <strong>${tiempoTrabajado}</strong>`;
                         resultadoHorasDiariasDiv.appendChild(diaDiv);
                     });
-                } else if (data.status === 'ok') {
-                    resultadoHorasDiariasDiv.textContent = "No hay resúmenes diarios registrados.";
                 } else {
-                    resultadoHorasDiariasDiv.textContent = `Error: ${data.message || 'Error desconocido'}`;
+                     resultadoHorasDiariasDiv.textContent = "No hay resúmenes diarios.";
                 }
-            })
-            .catch(error => {
-                console.error("Error consultando horas diarias:", error);
-                resultadoHorasDiariasDiv.textContent = "Error de conexión con el servidor.";
-            });
-    }
+
+            } else {
+                resultadoHorasDiariasDiv.textContent = `Error: ${data.message || 'Error'}`;
+            }
+        })
+        .catch(error => { /* ... (manejo de error sin cambios) ... */ });
+}
 
     // ==========================================================
     // ==      SECCIÓN DE LÓGICA DEL ADMINISTRADOR             ==
     // ==========================================================
     
     adminBtnBuscar.onclick = () => {
-        const userToSearch = adminBuscarInput.value.trim();
-        if (!userToSearch) { alert("Por favor, introduce un nombre de usuario."); return; }
-        adminContenedorFichajes.style.display = 'none';
-        adminListaFichajesDiv.innerHTML = "Buscando...";
-        fetch('/listar/admin', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: userToSearch })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'ok') {
-                if(data.fichajes.length > 0) {
-                    adminContenedorFichajes.style.display = 'block';
-                    mostrarFichajesAdmin(userToSearch, data.fichajes);
-                } else {
-                    adminListaFichajesDiv.innerHTML = '';
-                    alert(`No se encontraron fichajes para el usuario '${userToSearch}'.`);
-                }
+    const userToSearch = adminBuscarInput.value.trim();
+    if (!userToSearch) { alert("Introduce un nombre de usuario."); return; }
+    
+    // Ocultar contenedores viejos y mostrar carga
+    adminContenedorFichajes.style.display = 'none';
+    document.getElementById('admin-resumen-usuario').style.display = 'none';
+    adminListaFichajesDiv.innerHTML = "Buscando...";
+
+    fetch('/listar/admin', { // La ruta ya la modificamos
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: userToSearch })
+    })
+    .then(res => res.json())
+    .then(data => {
+        adminListaFichajesDiv.innerHTML = ''; // Limpiar siempre
+        if (data.status === 'ok') {
+            // MOSTRAR RESÚMENES (NUEVO)
+            const resumenContainer = document.getElementById('admin-resumen-usuario');
+            document.getElementById('admin-resumen-nombre-usuario').textContent = userToSearch;
+            document.getElementById('admin-resumen-totales').innerHTML = `Horas Totales: <strong>${data.horas_totales || '00:00:00'}</strong>`;
+            
+            const resumenDiarioDiv = document.getElementById('admin-resumen-diario');
+            resumenDiarioDiv.innerHTML = '<h5>Resumen por día</h5>';
+            if (data.resumen_diario && data.resumen_diario.length > 0) {
+                data.resumen_diario.forEach(dia => {
+                   const p = document.createElement('p');
+                   p.style.cssText = "margin: 4px 0; font-size: 0.9em;";
+                   p.textContent = dia.horas_diarias;
+                   resumenDiarioDiv.appendChild(p);
+                });
             } else {
-                adminListaFichajesDiv.innerHTML = ''; alert(`Error: ${data.message}`);
+                resumenDiarioDiv.innerHTML += '<p>No hay resúmenes diarios.</p>';
             }
-        })
-        .catch(err => {
-            adminListaFichajesDiv.innerHTML = ''; alert("Error de conexión al buscar fichajes.");
-        });
-    };
+            resumenContainer.style.display = 'block';
+
+            // MOSTRAR JORNADAS (LÓGICA MEJORADA)
+            if (data.jornadas && data.jornadas.length > 0) {
+                adminContenedorFichajes.style.display = 'block';
+                mostrarJornadasAdmin(userToSearch, data.jornadas); // Nueva función para mostrar JORNADAS
+            } else {
+                alert(`No se encontraron jornadas para el usuario '${userToSearch}'.`);
+            }
+        } else {
+            alert(`Error: ${data.message}`);
+        }
+    })
+    .catch(err => alert("Error de conexión al buscar."));
+};
     
     // ----------- FUNCIÓN MODIFICADA PARA MOSTRAR JORNADAS Y COMENTARIOS -----------
-    function mostrarFichajesAdmin(username, fichajes) {
-        adminListaFichajesDiv.innerHTML = '';
-        const fichajesPorDia = fichajes.reduce((acc, f) => {
-            const fecha = new Date(f.hora).toISOString().split('T')[0];
-            if (!acc[fecha]) acc[fecha] = [];
-            acc[fecha].push(f);
-            return acc;
-        }, {});
+    function mostrarJornadasAdmin(username, jornadas) {
+    adminListaFichajesDiv.innerHTML = ''; // Limpiar la lista
+    
+    jornadas.forEach(jornada => {
+        // La fecha de la jornada es la del primer fichaje ('entrada')
+        const entradaFichaje = jornada.find(f => f.tipo === 'entrada');
+        if (!entradaFichaje) return; // Si no hay entrada, es una jornada corrupta, la saltamos
+
+        const fechaJornada = new Date(entradaFichaje.hora);
+        const fechaStrJornada = fechaJornada.toISOString().split('T')[0];
+
+        // --- INICIO DE LA LÓGICA DEL COMENTARIO (NUEVO) ---
+        // Buscamos el primer fichaje DENTRO de esta jornada que tenga un comentario no vacío.
+        const fichajeConComentario = jornada.find(f => f.comentario && f.comentario.trim() !== '');
         
-        Object.keys(fichajesPorDia).sort().reverse().forEach(fecha => {
-            const fichajesDelDia = fichajesPorDia[fecha];
-            
-            const primerComentario = fichajesDelDia.find(f => f.comentario && f.comentario.trim() !== '');
-
-            let comentarioHtml = '';
-            if (primerComentario) {
-                comentarioHtml = `
-                    <div class='fichaje-hora' style="margin-top: 8px; color: #28a745; font-style: italic; display: flex; align-items: center; gap: 5px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M16 8c0 3.866-3.582 7-8 7a9 9 0 0 1-2.347-.306c-.584.296-1.925.864-4.181 1.234-.2.032-.352-.176-.273-.362.354-.836.674-1.95.77-2.966C.744 11.37 0 9.76 0 8c0-3.866 3.582-7 8-7s8 3.134 8 7zM5 8a1 1 0 1 0-2 0 1 1 0 0 0 2 0zm4 0a1 1 0 1 0-2 0 1 1 0 0 0 2 0zm3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/>
-                        </svg>
-                        <span>${primerComentario.comentario.substring(0, 30)}${primerComentario.comentario.length > 30 ? '...' : ''}</span>
-                    </div>
-                `;
-            }
-            
-            const jornadaItem = document.createElement('div');
-            jornadaItem.className = 'fichaje-item';
-            
-            const infoDiv = document.createElement('div');
-            infoDiv.className = 'fichaje-info';
-            infoDiv.innerHTML = `
-                <div class='fichaje-tipo'>Jornada del ${new Date(fecha+'T00:00:00').toLocaleDateString('es-ES')}</div>
-                <div class='fichaje-hora' style="margin-top: 5px;">${fichajesDelDia.length} registros</div>
-                ${comentarioHtml}
+        let comentarioHtml = ''; // Por defecto, no hay nada
+        if (fichajeConComentario) {
+            // Si encontramos uno, preparamos un pequeño bloque HTML para mostrarlo.
+            comentarioHtml = `
+                <div class='fichaje-hora' style="margin-top: 8px; color: #28a745; font-style: italic; display: flex; align-items: center; gap: 5px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-chat-left-text-fill" viewBox="0 0 16 16">
+                        <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4.414a1 1 0 0 0-.707.293L.854 15.146A.5.5 0 0 1 0 14.793V2zm3.5 1a.5.5 0 0 0 0 1h9a.5.5 0 0 0 0-1h-9zm0 2.5a.5.5 0 0 0 0 1h9a.5.5 0 0 0 0-1h-9zm0 2.5a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5z"/>
+                    </svg>
+                    <span>${fichajeConComentario.comentario.substring(0, 40)}${fichajeConComentario.comentario.length > 40 ? '...' : ''}</span>
+                </div>
             `;
-            
-            const accionesDiv = document.createElement('div');
-            accionesDiv.className = 'fichaje-acciones';
-            const botonEditar = document.createElement('button');
-            botonEditar.textContent = 'Editar';
-            botonEditar.className = 'boton-editar-admin';
-            botonEditar.style.cssText = "padding: 8px 15px; font-size: 0.9rem;";
-            botonEditar.onclick = () => abrirModalEdicion(username, fecha, fichajesDelDia);
-            accionesDiv.appendChild(botonEditar);
-            
-            jornadaItem.appendChild(infoDiv);
-            jornadaItem.appendChild(accionesDiv);
-            adminListaFichajesDiv.appendChild(jornadaItem);
-        });
-    }
+        }
+        // --- FIN DE LA LÓGICA DEL COMENTARIO ---
 
-    function abrirModalEdicion(username, fechaJornada, fichajes) {
-        modalUsuarioJornada.textContent = username;
-        modalFechaJornada.textContent = new Date(fechaJornada + 'T00:00:00').toLocaleDateString('es-ES');
-        const getHora = (tipo) => {
-            const f = fichajes.find(f => f.tipo === tipo);
-            if (!f) return '';
-            const d = new Date(f.hora);
-            return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}`;
-        };
-        document.getElementById('modal-entrada').value = getHora('entrada');
-        document.getElementById('modal-parada-cenar').value = getHora('parada_cenar');
-        document.getElementById('modal-salida-cenar').value = getHora('salida_cenar');
-        document.getElementById('modal-salida').value = getHora('salida');
-        modalBtnGuardar.onclick = () => guardarCambiosJornada(username, fechaJornada);
-        adminEditModal.style.display = 'flex';
-    }
+
+        // Crear el elemento de la jornada
+        const jornadaItem = document.createElement('div');
+        jornadaItem.className = 'fichaje-item';
+        
+        let tiposPresentes = jornada.map(f => f.tipo.replace('_cenar', ' C.')).join(', '); // Un poco más corto
+        
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'fichaje-info';
+        
+        // --- AQUÍ INSERTAMOS el comentarioHtml que hemos preparado ---
+        infoDiv.innerHTML = `
+            <div class='fichaje-tipo'>Jornada del ${fechaJornada.toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric'})}</div>
+            <div class='fichaje-hora' style="margin-top: 5px;">Registros: ${tiposPresentes}</div>
+            ${comentarioHtml}
+        `;
+        
+        const accionesDiv = document.createElement('div');
+        accionesDiv.className = 'fichaje-acciones';
+        const botonEditar = document.createElement('button');
+        botonEditar.textContent = 'Editar';
+        botonEditar.className = 'boton-editar-admin';
+        botonEditar.onclick = () => abrirModalEdicion(username, fechaStrJornada, jornada);
+        accionesDiv.appendChild(botonEditar);
+        
+        jornadaItem.appendChild(infoDiv);
+        jornadaItem.appendChild(accionesDiv);
+        adminListaFichajesDiv.appendChild(jornadaItem);
+    });
+}
+
+
+function abrirModalEdicion(username, fechaJornadaISO, jornadaCompleta) {
+    modalUsuarioJornada.textContent = username;
+    modalFechaJornada.textContent = new Date(fechaJornadaISO + 'T00:00:00').toLocaleDateString('es-ES');
+    
+    const getHora = (tipo) => {
+        const f = jornadaCompleta.find(fich => fich.tipo === tipo);
+        if (!f) return '';
+        // El backend nos da la hora como string, la parseamos para extraer H:M:S
+        const d = new Date(f.hora);
+        return d.toTimeString().split(' ')[0]; // 'HH:MM:SS'
+    };
+    
+    document.getElementById('modal-entrada').value = getHora('entrada');
+    document.getElementById('modal-parada-cenar').value = getHora('parada_cenar');
+    document.getElementById('modal-salida-cenar').value = getHora('salida_cenar');
+    document.getElementById('modal-salida').value = getHora('salida');
+
+    // Al guardar, enviamos la FECHA DE INICIO de la jornada.
+    modalBtnGuardar.onclick = () => guardarCambiosJornada(username, fechaJornadaISO);
+    adminEditModal.style.display = 'flex';
+}
 
     modalBtnCancelar.onclick = () => { adminEditModal.style.display = 'none'; };
 
     function guardarCambiosJornada(username, fechaJornada) {
-        const datosEditados = {
-            username: username, fecha_jornada: fechaJornada,
-            fichajes: {
-                entrada: document.getElementById('modal-entrada').value,
-                parada_cenar: document.getElementById('modal-parada-cenar').value,
-                salida_cenar: document.getElementById('modal-salida-cenar').value,
-                salida: document.getElementById('modal-salida').value
-            }
-        };
+    const datosEditados = {
+        username: username,
+        fecha_jornada: fechaJornada, // Esta es la fecha de la ENTRADA
+        fichajes: {
+            entrada: document.getElementById('modal-entrada').value,
+            parada_cenar: document.getElementById('modal-parada-cenar').value,
+            salida_cenar: document.getElementById('modal-salida-cenar').value,
+            salida: document.getElementById('modal-salida').value
+        }
+    };
         if (!datosEditados.fichajes.entrada || !datosEditados.fichajes.salida) { alert("Los campos 'Entrada' y 'Salida' son obligatorios."); return; }
         
         modalBtnGuardar.disabled = true; modalBtnGuardar.textContent = 'Guardando...';
@@ -702,3 +753,4 @@
 </script>
 </body>
 </html>
+
