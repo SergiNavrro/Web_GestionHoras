@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template, session
 import model  # Tu archivo model.py
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta 
 import pytz
 
 
@@ -96,6 +96,68 @@ def area_privada():
         return "Acceso denegado. Inicia sesión.", 401
     return f"Hola {session['username']}, estás logueado como {session['tipo']}"
 
+# --- NUEVA FUNCIÓN DE CÁLCULO DE HORAS, A PRUEBA DE MEDIANOCHE ---
+def calcular_horas_jornada(jornada):
+    """Calcula las horas trabajadas para una única jornada (lista de fichajes)."""
+    fichajes = {f['tipo']: f['hora'] for f in jornada}
+    
+    # Obtenemos los datetime de cada fichaje, si existen
+    entrada = fichajes.get('entrada')
+    parada_cena = fichajes.get('parada_cenar')
+    salida_cena = fichajes.get('salida_cenar')
+    salida = fichajes.get('salida')
+
+    # Si falta la entrada o la salida, no se puede calcular
+    if not entrada or not salida:
+        return None
+        
+    tiempo_trabajado = timedelta(0) # Inicializamos un timedelta
+
+    if parada_cena and salida_cena:
+        # Jornada con pausa para cenar
+        primer_tramo = parada_cena - entrada
+        segundo_tramo = salida - salida_cena
+        tiempo_trabajado = primer_tramo + segundo_tramo
+    else:
+        # Jornada sin pausa (o incompleta)
+        tiempo_trabajado = salida - entrada
+
+    # Convertimos el timedelta a un formato de string H:M:S
+    total_seconds = int(tiempo_trabajado.total_seconds())
+    if total_seconds < 0: return None # No debería pasar
+
+    horas = total_seconds // 3600
+    minutos = (total_seconds % 3600) // 60
+    segundos = total_seconds % 60
+
+    # La fecha de la jornada es la fecha de la entrada
+    fecha_de_la_jornada = entrada.strftime('%Y-%m-%d')
+    
+    return f"{fecha_de_la_jornada} - {horas:02d}:{minutos:02d}:{segundos:02d}"
+
+# --- NUEVA FUNCIÓN PARA AGRUPAR FICHAJES ---
+def agrupar_fichajes_en_jornadas(fichajes):
+    jornadas = []
+    jornada_actual = []
+    for fichaje in fichajes:
+        if fichaje['tipo'] == 'entrada':
+            # Si encontramos una 'entrada' y ya había una jornada empezada, la guardamos
+            if jornada_actual:
+                jornadas.append(jornada_actual)
+            # Empezamos una nueva jornada
+            jornada_actual = [fichaje]
+        elif jornada_actual: # Si no es entrada, la añadimos a la jornada actual
+            jornada_actual.append(fichaje)
+
+    # Añadimos la última jornada que estaba en proceso
+    if jornada_actual:
+        jornadas.append(jornada_actual)
+
+    # La función devolvía las jornadas en orden cronológico, la invertimos para mostrar las más nuevas primero
+    jornadas.reverse()
+    return jornadas
+    
+    
 @app.route('/fichar/<username>', methods=['POST'])
 def fichar_lista(username):
     data = request.get_json()
@@ -117,18 +179,21 @@ def fichar_lista(username):
     print(f"Fichajes devueltos para {username}: {fichajes}")
 
     if tipo == 'salida':
-        hora_diaria = calcular_horas(fichajes)
-        horas_totales = model.obtener_horas(username)
-        print(f"Horas tablas totales {horas_totales}")
-        if horas_totales == None:
-            horas_totales_calculadas = hora_diaria
-            print(f"HORAS TOTALES = {horas_totales_calculadas}, HORA DIARIA = {hora_diaria}")
-        else:
-            horas_totales_calculadas = sumar_horas_totales(hora_diaria, horas_totales)
+        # Buscamos la jornada completa que acabamos de terminar
+        fichajes_todos = model.listar_fichajes_todos(username)
+        jornadas_agrupadas = agrupar_fichajes_en_jornadas(fichajes_todos)
+        jornada_finalizada = jornadas_agrupadas[0] # La más reciente
 
-        model.insertar_horas_diarias(username, hora_diaria)
-        model.insertar_horas_totales(username, horas_totales_calculadas)
-
+        # Recalculamos sus horas
+        hora_diaria_str = calcular_horas_jornada(jornada_finalizada)
+        if hora_diaria_str:
+            model.insertar_horas_diarias(username, hora_diaria_str)
+            # El recálculo total lo haremos en una tarea aparte o lo simplificamos
+            # por ahora, para no complicar en exceso esta respuesta.
+            # Puedes llamar aquí a la función que recalcula y guarda el total del mes.
+            fecha_jornada = hora_diaria_str.split(' - ')[0]
+            recalcular_y_actualizar_total_mensual(username, fecha_jornada)
+            
     return jsonify({"fichajes": fichajes})
 
 # Ruta para consultar el estado (ahora corregida)
@@ -249,18 +314,20 @@ def logout():
 
 
 
-# --- NUEVA RUTA para ver el resumen de horas diarias ---
+# --- RUTA DE HORAS DIARIAS MEJORADA (PARA USUARIO) ---
 @app.route('/horas_diarias/<username>', methods=['GET'])
 def get_horas_diarias(username):
     if 'username' not in session or session['username'] != username:
         return jsonify({"status": "error", "message": "No autorizado"}), 401
     
-    # Llamamos a la nueva función del modelo
-    resumen = model.ver_horas_diarias(username)
+    resumen_diario = model.ver_horas_diarias(username)
+    horas_totales = model.obtener_horas(username)
     
-    # formateamos la salida para que sea fácil de usar en JS
-    # La función del modelo ya devuelve una lista de diccionarios, perfecto.
-    return jsonify({"status": "ok", "resumen": resumen})
+    return jsonify({
+        "status": "ok",
+        "resumen": resumen_diario,
+        "horas_totales": horas_totales # ¡Añadimos las horas totales!
+    })
 
 
 # --- RUTA PARA AÑADIR/EDITAR COMENTARIO (CORREGIDA PARA FORMATEAR LA FECHA) ---
@@ -309,27 +376,103 @@ def anadir_comentario():
 '''                                                                                                                     
 CODIGO PARA ADMINISTRADOR                                                                                               
 '''
-# --- RUTA PARA QUE EL ADMIN LISTE LOS FICHAJES DE CUALQUIER USUARIO ---
+# --- RUTA LISTAR PARA ADMIN TOTALMENTE REHECHA ---
 @app.route('/listar/admin', methods=['POST'])
 def listar_users_admin():
-    # Verifica que el admin ha iniciado sesión
     if 'username' not in session or session.get('tipo') != 'admin':
         return jsonify({'status': 'error', 'message': 'Acceso no autorizado'}), 401
 
     data = request.get_json()
-    if not data or 'username' not in data:
-        return jsonify({'status': 'error', 'message': 'Falta el nombre de usuario a buscar'}), 400
-
     username_a_buscar = data.get('username')
     
-    # Llama a la función del modelo para obtener TODOS los fichajes (sin LIMIT 4)
-    # Para esto, es mejor tener una función separada en el modelo
-    fichajes = model.listar_fichajes(username_a_buscar) 
+    # 1. Obtenemos TODOS los fichajes del usuario
+    fichajes_todos = model.listar_fichajes_todos(username_a_buscar) 
     
-    print(f"[ADMIN] Fichajes devueltos para '{username_a_buscar}': {len(fichajes)} registros.")
+    # 2. Los agrupamos en jornadas lógicas
+    jornadas_agrupadas = agrupar_fichajes_en_jornadas(fichajes_todos)
     
-    # Aunque no se encuentren fichajes, devolvemos un ok con una lista vacía
-    return jsonify({'status': 'ok', 'fichajes': fichajes})
+    # 3. Obtenemos los resúmenes y totales
+    resumen_diario = model.ver_horas_diarias(username_a_buscar)
+    horas_totales = model.obtener_horas(username_a_buscar)
+    
+    # Devolvemos todo bien estructurado
+    return jsonify({
+        'status': 'ok',
+        'jornadas': jornadas_agrupadas,
+        'resumen_diario': resumen_diario,
+        'horas_totales': horas_totales
+    })
+
+@app.route('/admin/editar_jornada', methods=['POST'])
+def editar_jornada_admin():
+    if 'username' not in session or session.get('tipo') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Acceso no autorizado'}), 401
+
+    data = request.get_json()
+    username = data.get('username')
+    fecha_jornada_str = data.get('fecha_jornada') # La fecha de la 'entrada' original
+    nuevos_fichajes_hora = data.get('fichajes')
+
+    # PASO 1: BORRAR DE FORMA SEGURA LA JORNADA ANTIGUA COMPLETA
+    exito_borrado = model.borrar_fichajes_jornada(username, fecha_jornada_str)
+    if not exito_borrado:
+        return jsonify({'status': 'error', 'message': 'No se pudo borrar la jornada anterior para actualizar.'}), 500
+
+    # PASO 2: RE-INSERTAR LOS NUEVOS FICHAJES
+    # Esta lógica determina si la hora corresponde al día de la jornada o al siguiente
+    jornada_reconstruida = []
+    hora_referencia = None
+
+    # Ordenamos por si el admin los pone desordenados. 'entrada' siempre primero.
+    tipos_ordenados = ['entrada', 'parada_cenar', 'salida_cenar', 'salida']
+
+    for tipo in tipos_ordenados:
+        hora_str = nuevos_fichajes_hora.get(tipo)
+        if hora_str:
+            fecha_actual_str = fecha_jornada_str
+            hora_obj_actual = datetime.strptime(hora_str, '%H:%M:%S').time()
+
+            if hora_referencia and hora_obj_actual < hora_referencia:
+                # Si la hora actual es menor que la anterior, es del día siguiente.
+                fecha_dt = datetime.strptime(fecha_jornada_str, '%Y-%m-%d') + timedelta(days=1)
+                fecha_actual_str = fecha_dt.strftime('%Y-%m-%d')
+            
+            hora_referencia = hora_obj_actual # Actualizamos la referencia
+
+            # Construimos el objeto datetime completo y lo guardamos
+            hora_completa = datetime.strptime(f"{fecha_actual_str} {hora_str}", "%Y-%m-%d %H:%M:%S")
+            model.fichar(username, tipo, hora_completa)
+            jornada_reconstruida.append({'tipo': tipo, 'hora': hora_completa})
+    
+    # PASO 3: RECALCULAR LAS HORAS DE ESA JORNADA Y GUARDARLAS
+    if jornada_reconstruida:
+        horas_dia_recalculadas_str = calcular_horas_jornada(jornada_reconstruida)
+        if horas_dia_recalculadas_str:
+            # La función insertar_horas_diarias ya debería manejar el UPDATE si existe.
+            model.insertar_horas_diarias(username, horas_dia_recalculadas_str)
+
+    # (Opcional) Aquí podrías recalcular el total de todo el mes
+    recalcular_y_actualizar_total_mensual(username, fecha_jornada_str)
+            
+    return jsonify({'status': 'ok', 'message': 'Jornada actualizada y horas recalculadas.'})
+
+def determinar_fecha_fichaje(fecha_inicio_jornada, hora_actual_str, jornada_parcial):
+    """Determina si la hora pertenece al día de inicio o al siguiente."""
+    fecha_inicio = datetime.strptime(fecha_inicio_jornada, '%Y-%m-%d').date()
+    hora_actual = datetime.strptime(hora_actual_str, '%H:%M:%S').time()
+
+    if not jornada_parcial: # Si es el primer fichaje (entrada), es la fecha de inicio
+        return fecha_inicio.strftime('%Y-%m-%d')
+    
+    # Comparamos con la hora del último fichaje añadido
+    ultimo_fichaje_hora = jornada_parcial[-1]['hora'].time()
+    
+    if hora_actual < ultimo_fichaje_hora:
+        # La nueva hora es anterior a la última -> Es del día siguiente
+        return (fecha_inicio + timedelta(days=1)).strftime('%Y-%m-%d')
+    else:
+        # La nueva hora es posterior -> Es del mismo día
+        return jornada_parcial[-1]['hora'].strftime('%Y-%m-%d')
 
 
 # --- RUTA PARA QUE EL ADMIN AÑADA UN NUEVO USUARIO ---
@@ -356,107 +499,53 @@ def añadir_user_admin():
         return jsonify(resultado), 409 # 409 Conflicto (usuario ya existe)
 
 
-
-@app.route('/admin/editar_jornada', methods=['POST'])
-def editar_jornada_admin():
-    if 'username' not in session or session.get('tipo') != 'admin':
-        return jsonify({'status': 'error', 'message': 'Acceso no autorizado'}), 401
-
-    data = request.get_json()
-    username_a_editar = data.get('username')
-    fecha_jornada = data.get('fecha_jornada') # Formato 'YYYY-MM-DD'
-    nuevos_fichajes = data.get('fichajes')
-
-    if not all([username_a_editar, fecha_jornada, nuevos_fichajes]):
-        return jsonify({'status': 'error', 'message': 'Faltan datos para la edición'}), 400
-
-    try:
-        # 1. Edita la jornada en la base de datos
-        exito_edicion = model.editar_jornada_admin(username_a_editar, fecha_jornada, nuevos_fichajes)
-
-        if exito_edicion:
-            # 2. Obtenemos TODOS los fichajes DEL DÍA MODIFICADO usando nuestra nueva función dual
-            #    Le pasamos la fecha_jornada para activar el modo de búsqueda por fecha.
-            fichajes_del_dia_actualizado = model.listar_fichajes(username_a_editar, fecha_jornada)
-            
-            # 3. Recalculamos las horas de ESE DÍA con los fichajes actualizados
-            if fichajes_del_dia_actualizado:
-                # ¡OJO! Tu función calcular_horas necesita una pequeña adaptación si usa date.today()
-                # Adaptación sugerida:
-                horas_dia_recalculadas_str = calcular_horas(fichajes_del_dia_actualizado)
-                
-                if horas_dia_recalculadas_str:
-                    # 4. Insertamos las horas diarias recién calculadas en su tabla
-                    #    Asumo que tu función para insertar/actualizar horas diarias existe
-                    #    y se encarga de hacer INSERT... ON DUPLICATE KEY UPDATE
-                    model.insertar_horas_diarias(username_a_editar, horas_dia_recalculadas_str)
-
-            # (Opcional) Aquí podrías llamar a la función que recalcula el total de todo el mes
-            # recalcular_y_actualizar_total_mensual(username_a_editar, fecha_jornada)
-            
-            return jsonify({'status': 'ok', 'message': 'Jornada actualizada y horas diarias recalculadas.'})
-        else:
-            return jsonify({'status': 'error', 'message': 'No se pudo actualizar la jornada en la BD.'}), 500
-    
-    except Exception as e:
-        print(f"Error en la ruta /admin/editar_jornada: {e}")
-        return jsonify({'status': 'error', 'message': f'Error interno del servidor: {e}'}), 500
-
-def recalcular_y_actualizar_total_mensual(username, fecha_jornada_str):
+# --- AÑADE ESTA NUEVA FUNCIÓN DE LÓGICA DE NEGOCIO ---
+def recalcular_y_actualizar_total_mensual(username, fecha_afectada_str):
     """
     Recalcula el total de horas para un usuario en un mes específico y lo actualiza en la BD.
     
     Args:
         username (str): El usuario cuyo total se va a recalcular.
-        fecha_jornada_str (str): Una fecha ('YYYY-MM-DD') dentro del mes que se debe recalcular.
+        fecha_afectada_str (str): Una fecha ('YYYY-MM-DD') dentro del mes que se debe recalcular.
     """
-    print(f"[RECALCULAR] Iniciando recálculo para '{username}' en el mes de {fecha_jornada_str}")
+    print(f"[RECALCULAR] Iniciando recálculo total para '{username}' en el mes de {fecha_afectada_str}")
 
     try:
-        # Convertimos el string de la fecha a un objeto datetime para poder obtener el mes y el año
-        fecha_obj = datetime.strptime(fecha_jornada_str, '%Y-%m-%d').date()
+        # 1. Obtener el mes y el año de la fecha afectada
+        fecha_obj = datetime.strptime(fecha_afectada_str, '%Y-%m-%d')
         mes = fecha_obj.month
-        año = fecha_obj.year
+        anio = fecha_obj.year
 
-        # 1. Obtenemos todas las horas diarias del usuario para el mes específico.
-        #    Asumo que model.ver_horas_diarias(username, mes, año) existe o la creamos.
-        #    Esta función debe devolver una lista de diccionarios, ej: [{'horas_diarias': '2024-05-30 - 08:01:15'}, ...]
+        # 2. Pedir al modelo todas las horas diarias de ese mes
+        resumen_mensual = model.ver_horas_diarias_mes(username, anio, mes) 
         
-        # Necesitaremos una función en model.py que pueda filtrar por mes/año
-        # ej: model.ver_horas_diarias_mes(username, mes, año)
-        resumen_mensual = model.ver_horas_diarias_mes(username, mes, año) 
-        
-        if not resumen_mensual:
-            print(f"[RECALCULAR] No se encontraron horas diarias para '{username}' en {mes}/{año}. Total puesto a cero.")
-            model.insertar_horas_totales(username, "00:00:00") # O manejarlo como prefieras
-            return True
-
         total_general_segundos = 0
         
-        # 2. Sumamos todas las horas
-        for dia in resumen_mensual:
-            # Extraemos la parte de la hora 'HH:MM:SS' de la cadena 'YYYY-MM-DD - HH:MM:SS'
-            # Suponemos que dia['horas_diarias'] existe y tiene el formato correcto
-            if 'horas_diarias' in dia and dia['horas_diarias'] and ' - ' in dia['horas_diarias']:
-                tiempo_str = dia['horas_diarias'].split(' - ')[1]
-                h, m, s = map(int, tiempo_str.split(':'))
-                total_general_segundos += h * 3600 + m * 60 + s
+        # 3. Sumar todas las horas
+        if resumen_mensual:
+            for dia in resumen_mensual:
+                # Extraemos la parte de la hora 'HH:MM:SS' de la cadena 'YYYY-MM-DD - HH:MM:SS'
+                if 'horas_diarias' in dia and dia['horas_diarias'] and ' - ' in dia['horas_diarias']:
+                    tiempo_str = dia['horas_diarias'].split(' - ')[1]
+                    h, m, s = map(int, tiempo_str.split(':'))
+                    total_general_segundos += h * 3600 + m * 60 + s
         
-        # 3. Convertimos el total de segundos de nuevo a formato HH:MM:SS
+        # 4. Convertir el total de segundos de nuevo a formato string
         total_horas = total_general_segundos // 3600
         total_minutos = (total_general_segundos % 3600) // 60
         total_segundos_final = total_general_segundos % 60
         
-        horas_totales_calculadas = f"{total_horas:02d}:{total_minutos:02d}:{total_segundos_final:02d}"
+        # Guardamos el total como un simple string "HH:MM:SS"
+        horas_totales_calculadas_str = f"{total_horas:02d}:{total_minutos:02d}:{total_segundos_final:02d}"
         
-        print(f"[RECALCULAR] Nuevo total de horas para '{username}' en {mes}/{año}: {horas_totales_calculadas}")
+        print(f"[RECALCULAR] Nuevo total para '{username}' en {mes}/{anio}: {horas_totales_calculadas_str}")
 
-        # 4. Insertamos el nuevo total en la base de datos
-        model.insertar_horas_totales(username, horas_totales_calculadas)
+        # 5. Insertar el nuevo total en la base de datos
+        model.insertar_horas_totales(username, horas_totales_calculadas_str)
         return True
 
     except Exception as e:
-        print(f"[RECALCULAR] Error grave durante el recálculo: {e}")
+        print(f"[RECALCULAR] Error grave durante el recálculo total: {e}")
         return False
         
         
