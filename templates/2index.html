@@ -422,8 +422,18 @@
             tipo.textContent = f.tipo.replace('_', ' ');
             const hora = document.createElement('div');
             hora.className = 'fichaje-hora';
-            const fecha = new Date(f.hora);
-            hora.textContent = fecha.toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            
+            if (f.hora) {
+            const [fecha_parte, hora_parte] = f.hora.split(' '); // ["2025-08-01", "11:49:56"]
+            const [ano, mes, dia] = fecha_parte.split('-');
+            const [h, m, s] = hora_parte.split(':');
+            
+            // Reconstruimos a DD/MM/YYYY, HH:MM
+            hora.textContent = `${dia}/${mes}/${ano}, ${h}:${m}`;
+        } else {
+            hora.textContent = 'Hora no disponible';
+        }
+            
             info.appendChild(tipo); info.appendChild(hora);
             const acciones = document.createElement('div');
             acciones.className = 'fichaje-acciones';
@@ -654,10 +664,10 @@ function abrirModalEdicion(username, fechaJornadaISO, jornadaCompleta) {
     
     const getHora = (tipo) => {
         const f = jornadaCompleta.find(fich => fich.tipo === tipo);
-        if (!f) return '';
+         if (!f || !f.hora) return '';
         // El backend nos da la hora como string, la parseamos para extraer H:M:S
         const d = new Date(f.hora);
-        return d.toTimeString().split(' ')[0]; // 'HH:MM:SS'
+        return f.hora.split(' ')[1];
     };
     
     document.getElementById('modal-entrada').value = getHora('entrada');
