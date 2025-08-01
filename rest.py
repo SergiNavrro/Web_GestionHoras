@@ -174,9 +174,18 @@ def fichar_lista(username):
         # 3. Llamamos a la función del modelo con la hora generada
         model.fichar(username, tipo, hora_actual)
 
-    fichajes = model.listar_fichajes(username)
-    print(f"Resultado del botón {tipo}")
-    print(f"Fichajes devueltos para {username}: {fichajes}")
+    fichajes_raw = model.listar_fichajes(username) # Obtenemos los fichajes
+    
+    # --- AÑADE ESTE BUCLE DE CONVERSIÓN ---
+    fichajes = []
+    for f in fichajes_raw:
+        f_copy = f.copy()
+        if isinstance(f_copy.get('hora'), datetime):
+            f_copy['hora'] = f_copy['hora'].strftime('%Y-%m-%d %H:%M:%S')
+        fichajes.append(f_copy)
+    # --- FIN DEL BLOQUE AÑADIDO ---
+    
+    print(f"Fichajes devueltos para {username}: {fichajes}") # Esto ahora mostrará el texto
 
     if tipo == 'salida':
         # Buscamos la jornada completa que acabamos de terminar
@@ -330,7 +339,6 @@ def get_horas_diarias(username):
     })
 
 
-# --- RUTA PARA AÑADIR/EDITAR COMENTARIO (CORREGIDA PARA FORMATEAR LA FECHA) ---
 @app.route('/comentario', methods=['POST'])
 def anadir_comentario():
     data = request.get_json()
@@ -338,35 +346,28 @@ def anadir_comentario():
         return jsonify({'status': 'error', 'message': 'No se recibieron datos JSON'}), 400
 
     username = data.get('username')
+    # El JavaScript ahora envía el formato 'YYYY-MM-DD HH:MM:SS' directamente.
     hora_fichaje_js = data.get('hora_fichaje') 
     comentario = data.get('comentario')
 
     if not all([username, hora_fichaje_js, comentario is not None]):
         return jsonify({'status': 'error', 'message': 'Faltan datos (username, hora_fichaje o comentario)'}), 400
 
+    # YA NO SE NECESITA NINGUNA CONVERSIÓN NI PARSEO DE FECHA AQUÍ.
+    # El string que llega es exactamente el que la base de datos necesita.
     try:
-
-        formato_js = "%a, %d %b %Y %H:%M:%S %Z"
+        print(f"[DEBUG REST] Comentario recibido para la hora: '{hora_fichaje_js}'")
         
-        objeto_datetime = datetime.strptime(hora_fichaje_js, formato_js)
+        # Pasamos la cadena de texto directamente a la función del modelo.
+        resultado = model.insertar_comentario(username, hora_fichaje_js, comentario)
 
-        hora_fichaje_db = objeto_datetime.strftime("%Y-%m-%d %H:%M:%S")
-
-        print(f"[DEBUG REST] Hora recibida: {hora_fichaje_js}")
-        print(f"[DEBUG REST] Hora convertida para DB: {hora_fichaje_db}")
-        
-        resultado = model.insertar_comentario(username, hora_fichaje_db, comentario)
-
-        if resultado:
+        # La función del modelo devuelve un diccionario, lo comprobamos.
+        if resultado.get("status") == "ok":
              return jsonify({'status': 'ok'})
         else:
-             return jsonify({'status': 'error', 'message': 'No se encontró el fichaje para actualizar.'}), 404
+             # Devolvemos el mensaje de error que pueda venir del modelo
+             return jsonify({'status': 'error', 'message': resultado.get('message', 'No se encontró el fichaje')}), 404
 
-    except ValueError:
-        # Este error salta si el formato de la fecha no coincide con `formato_js`.
-        msg_error = f"El formato de la fecha recibido ('{hora_fichaje_js}') no es válido."
-        print(f"ERROR: {msg_error}")
-        return jsonify({'status': 'error', 'message': msg_error}), 400
     except Exception as e:
         print(f"Error inesperado al actualizar comentario: {e}")
         return jsonify({'status': 'error', 'message': f'Error interno del servidor: {e}'}), 500
@@ -385,8 +386,13 @@ def listar_users_admin():
     data = request.get_json()
     username_a_buscar = data.get('username')
     
-    # 1. Obtenemos TODOS los fichajes del usuario
     fichajes_todos = model.listar_fichajes_todos(username_a_buscar) 
+    
+    # --- AÑADE ESTE BUCLE PARA FORMATEAR TODAS LAS HORAS ---
+    for f in fichajes_todos:
+        if isinstance(f.get('hora'), datetime):
+            f['hora'] = f['hora'].strftime('%Y-%m-%d %H:%M:%S')
+    # --- FIN DEL BLOQUE AÑADIDO ---
     
     # 2. Los agrupamos en jornadas lógicas
     jornadas_agrupadas = agrupar_fichajes_en_jornadas(fichajes_todos)
