@@ -435,7 +435,15 @@ def editar_jornada_admin():
     for tipo in tipos_ordenados:
         hora_str = nuevos_fichajes_hora.get(tipo)
         if hora_str:
+            
+            # --- INICIO DEL CÓDIGO CORREGIDO PARA EL MÓVIL ---
+            # Normalizamos la hora para que SIEMPRE tenga segundos.
+            if hora_str.count(':') == 1:  # Si solo hay un ':', es formato HH:MM (móvil)
+                hora_str += ':00'         # Le añadimos los segundos para evitar errores.
+            # --- FIN DEL CÓDIGO CORREGIDO ---
+
             fecha_actual_str = fecha_jornada_str
+            # Esta línea ahora es segura, porque hora_str siempre tendrá el formato correcto HH:MM:SS.
             hora_obj_actual = datetime.strptime(hora_str, '%H:%M:%S').time()
 
             if hora_referencia and hora_obj_actual < hora_referencia:
