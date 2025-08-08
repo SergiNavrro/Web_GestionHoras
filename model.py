@@ -6,26 +6,29 @@ import os  # <-- AÑADIDO: Importamos la librería 'os'
 import mysql.connector
 
 def get_db_connection():
-    conexion = mysql.connector.connect(
-        host="sql7.freesqldatabase.com",
-        user="sql7792522",
-        password="IXStwXlpHx",
-        database="sql7792522"
-    )
-    return conexion
+    try:
+        conexion = mysql.connector.connect(
+            host="mainline.proxy.rlwy.net",            # Extraído del punto 1
+            user="root",                               # Punto 3
+            password="VkGGOktWQrFZWkzJlCFtsacxPIMmpCnJ", # Punto 4
+            database="railway",                        # Punto 5
+            port=53447                                 # Punto 2
+        )
+        return conexion
+    except mysql.connector.Error as err:
+        print(f"Error al conectar con la base de datos de Railway: {err}")
+        # En caso de error de conexión, el programa no debe continuar.
+        # Lanzamos la excepción para que el script se detenga.
+        raise err
 	
 def init():
     con = None
     try:
         # Para la inicialización, nos conectamos sin especificar la base de datos primero
-        con = mysql.connector.connect(
-            host="sql7.freesqldatabase.com",
-            user="sql7792522",
-            password="IXStwXlpHx"
-        )
+        con = get_db_connection() 
         cur = con.cursor()
         
-        db_name = os.getenv('DB_NAME', 'sql7792522')
+        db_name = os.getenv('DB_NAME', 'railway')
         cur.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
         cur.execute(f"USE {db_name}")
 
