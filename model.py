@@ -8,11 +8,11 @@ import mysql.connector
 def get_db_connection():
     try:
         conexion = mysql.connector.connect(
-            host="mainline.proxy.rlwy.net",            # Extraído del punto 1
+            host="turntable.proxy.rlwy.net",            # Extraído del punto 1
             user="root",                               # Punto 3
-            password="VkGGOktWQrFZWkzJlCFtsacxPIMmpCnJ", # Punto 4
+            password="dBEjzYosbIxjKVbjSSjJkByryFVnXGEk", # Punto 4
             database="railway",                        # Punto 5
-            port=53447                                 # Punto 2
+            port=48385                                # Punto 2
         )
         return conexion
     except mysql.connector.Error as err:
